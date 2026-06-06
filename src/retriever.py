@@ -13,8 +13,11 @@ class HybridRetriever:
     def __init__(self, vectorstore, all_chunks: list[Document]):
         self.vectorstore = vectorstore
         self.all_chunks = all_chunks
-        corpus = [c.page_content.lower().split() for c in all_chunks] or [[]]
-        self.bm25 = BM25Okapi(corpus)
+        if all_chunks:
+            corpus = [c.page_content.lower().split() for c in all_chunks]
+            self.bm25 = BM25Okapi(corpus)
+        else:
+            self.bm25 = None
 
     def retrieve(self, query: str, ticker: str | None = None, k: int = 6) -> list[Document]:
         # Dense semantic search (LangChain VectorStoreRetriever — Concept #1).
@@ -22,19 +25,17 @@ class HybridRetriever:
         dense = self.vectorstore.similarity_search(query, k=k, filter=filt)
 
         # Sparse BM25 keyword search over the full corpus.
-        scores = self.bm25.get_scores(query.lower().split())
-        ranked_idx = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)
-
-        # Respect the ticker filter on the sparse side too, otherwise a
-        # company-filtered query leaks other companies' chunks via BM25.
         sparse: list[Document] = []
-        for i in ranked_idx:
-            chunk = self.all_chunks[i]
-            if ticker and chunk.metadata.get("ticker") != ticker:
-                continue
-            sparse.append(chunk)
-            if len(sparse) >= k:
-                break
+        if self.bm25 is not None:
+            scores = self.bm25.get_scores(query.lower().split())
+            ranked_idx = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)
+            for i in ranked_idx:
+                chunk = self.all_chunks[i]
+                if ticker and chunk.metadata.get("ticker") != ticker:
+                    continue
+                sparse.append(chunk)
+                if len(sparse) >= k:
+                    break
 
         # Merge and deduplicate (first occurrence wins).
         seen: set[str] = set()
