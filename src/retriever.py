@@ -13,7 +13,7 @@ class HybridRetriever:
     def __init__(self, vectorstore, all_chunks: list[Document]):
         self.vectorstore = vectorstore
         self.all_chunks = all_chunks
-        corpus = [c.page_content.lower().split() for c in all_chunks]
+        corpus = [c.page_content.lower().split() for c in all_chunks] or [[]]
         self.bm25 = BM25Okapi(corpus)
 
     def retrieve(self, query: str, ticker: str | None = None, k: int = 6) -> list[Document]:

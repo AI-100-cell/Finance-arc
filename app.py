@@ -22,11 +22,12 @@ st.caption('Ask anything about any company earnings — powered by multi-agent R
 @st.cache_resource
 def load_system():
     vs      = load_vector_store()
-    # Load all chunks into memory for BM25 (retrieve metadata from vs)
     results = vs.get(include=['documents', 'metadatas'])
     from langchain_core.documents import Document
+    docs  = results.get('documents') or []
+    metas = results.get('metadatas') or []
     chunks  = [Document(page_content=d, metadata=m)
-               for d, m in zip(results['documents'], results['metadatas'])]
+               for d, m in zip(docs, metas)]
     retriever = HybridRetriever(vs, chunks)
     graph   = build_graph(retriever)
     return graph
